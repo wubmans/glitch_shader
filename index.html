@@ -1,0 +1,235 @@
+<html>
+
+    <head>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com"> 
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;600;900&display=swap" rel="stylesheet">
+        <style>
+
+            body {
+                width: 100%;
+                display: block;
+            }
+
+            .poppins {
+                font-family: 'Poppins', sans-serif;
+            }
+
+            canvas {
+                border: 1px solid black;
+                position: absolute;
+                width: 450px;
+                height: 350px;
+                left: 50%;
+                z-index: -1;
+                top: 280px;
+                margin-left: -320px;
+                
+
+            }
+
+            #tv {
+                position: absolute;
+                top: 100px;
+                width: 670px;
+                margin-left: -350px;
+                left: 50%;
+            }
+        </style>
+
+
+
+    <script id="vertex-shader" type="glsl">
+
+        attribute vec4 a_position;
+        attribute vec2 a_texCoord;
+        varying vec2 v_texCoord;
+        uniform float time;
+
+        void main() {
+            gl_Position = a_position;
+            v_texCoord = a_texCoord;
+        }
+
+
+    </script>
+
+    <script id="fragment-shader" type="glsl">
+
+        precision mediump float;
+        uniform float time;
+        uniform sampler2D u_image;
+
+        varying vec2 v_texCoord;
+
+        float rand(vec2 co){
+            return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+        }
+
+        void main() {
+
+  
+
+            float su = step(0.9, rand(vec2(time, time))) * rand(vec2(time, time)) * 5.0;
+            //float su = 1.0;
+            float s = 1.0 + su * 10.0;
+
+            // s += step(0.7, rand(vec2(time, time))) * su;
+
+            float q = floor(v_texCoord.y * s) / s + 1.0;
+            float r = floor(v_texCoord.x * s) / s + 1.0;
+            //float xrand = rand(vec2(x, x)) * 0.3 * rand(vec2(time, time)) - 0.15;
+
+            float dx = step(0.3, rand(vec2(time, time)) * rand(vec2(q, q))) * 0.04 * sin(q) * q * (rand(vec2(q, q)) * 2.0 - 1.0);
+            float dy = 0.00; //0.02 * r * (rand(vec2(r, r)) * 2.0 - 1.0);
+            dy += step(0.8, rand(vec2(time, time))) * time;
+            float wave = 0.4 * step(0.95, rand(vec2(time, time))) * rand(vec2(time,time)) * sin(v_texCoord.y * 2.0);
+            float wave2 = step(0.95, rand(vec2(time, time))) * 0.01 * sin(v_texCoord.y / rand(vec2(time, time)) + rand(vec2(time + 0.3, time + 0.4)));
+            wave += wave2;
+
+            gl_FragColor.r = texture2D(u_image, v_texCoord + vec2(dx + wave, dy)).x;
+            gl_FragColor.g = texture2D(u_image, v_texCoord + vec2((dx + wave) * 1.003, dy)).y;
+            gl_FragColor.b = texture2D(u_image, v_texCoord + vec2((dx + wave) * -1.00, dy)).z;
+   
+            gl_FragColor.a = 1.0;
+        } 
+    </script>
+    </head>
+    <body>
+        <div style="width: 100%; height: 700px;">
+            <img id="tv" src="file:///Users/wubmans/Documents/spul%20Diede/webgl/teeveetje.png"; alt="">
+            <canvas id="canvas"></canvas>  
+        </div>
+
+        <div style="width: 100%; font-size: 60px; margin-top: 200px">
+            <h2 class="poppins" style="text-align: center"><span style="font-weight: 600;">koele_boy</span> <span style="font-weight: 100">webDesign</span></h2>
+        </div>
+
+    </body>
+
+
+
+    <script>
+
+        const canvas = document.querySelector("#canvas");
+        const gl = canvas.getContext("webgl");
+
+        let image; 
+
+        const positions = [
+            -1, -1,
+            -1, 1,
+            1, 1,
+            1, 1,
+            1, -1,
+            -1, -1,
+        ]
+
+        let timeUniformLocation;
+
+        function createShader(selector, type) {
+
+            console.log(selector, type)
+            const source = document.querySelector(selector).text;
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.log(gl.getShaderInfoLog(shader));
+            }
+
+            return shader;
+        }
+
+        function createProgram(vertexShader, fragmentShader) {
+            const program = gl.createProgram()
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+
+            return program;
+        }
+
+        function init() {
+            
+            timeUniformLocation = gl.getUniformLocation(program, "time");
+
+            const texCoordLocation = gl.getAttribLocation(program, "a_texCoord");
+            const texCoordBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+            1, 1,
+            1, 0,
+            0, 0,
+            0, 0,
+            0, 1,
+            1, 1,
+            ]), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(texCoordLocation);
+            gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+            
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+ 
+            // Set the parameters so we can render any size image.
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+ 
+            // Upload the image into the texture.
+
+            const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(positionAttributeLocation);
+ 
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.useProgram(program);
+
+            gl.vertexAttribPointer(
+                positionAttributeLocation, 
+                2, 
+                gl.FLOAT, 
+                false, 
+                0, 
+                0
+            )
+
+           
+        }
+        
+        function render(t) {
+            //console.log(t)
+            gl.uniform1f(timeUniformLocation, t / 1000); // convert from milis to seconds
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            requestAnimationFrame(render);
+        }
+
+
+
+        const vShader = createShader("#vertex-shader", gl.VERTEX_SHADER);
+        const fShader = createShader("#fragment-shader", gl.FRAGMENT_SHADER);
+        const program = createProgram(vShader, fShader);
+
+        
+
+        image = new Image();
+        image.src = "file:///Users/wubmans/Documents/spul%20Diede/webgl/rose.png";
+        image.onload = function() {
+            init();
+            render();
+        }
+        
+        //render();
+
+    </script>
+
+</html>
